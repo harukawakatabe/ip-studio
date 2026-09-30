@@ -160,7 +160,7 @@ function showLlm(llm) {
   el.llmChip.textContent = llm.live ? `${llm.label} · ${llm.model}` : llm.label;
   el.llmChip.classList.toggle('warn', !llm.live);
   el.llmChip.title = llm.live
-    ? `当前模型通道：${llm.provider} / ${llm.model}`
+    ? `当前模型通道：${llm.label} / ${llm.model}` + (llm.fallbacks?.length ? `\n主通道失败自动切：${llm.fallbacks.join(' → ')}` : '')
     : '未检测到模型密钥，当前为演示模式：流程完整，内容是本地模板。在 .env 中配置密钥后自动切换。';
 }
 

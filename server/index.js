@@ -230,6 +230,7 @@ async function serveStatic(path, res) {
 
 server.listen(PORT, () => {
   const info = providerInfo();
+  const fallback = info.live && info.fallbacks?.length ? `，兜底：${info.fallbacks.join(' → ')}` : '';
   console.log(`\n  文案工坊 已启动  →  http://localhost:${PORT}`);
-  console.log(`  模型通道：${info.label}${info.live ? `（${info.model}）` : ' —— 复制 .env.example 为 .env 并填入密钥即可接入真实模型'}\n`);
+  console.log(`  模型通道：${info.label}${info.live ? `（${info.model}）${fallback}` : ' —— 复制 .env.example 为 .env 并填入密钥即可接入真实模型'}\n`);
 });
