@@ -18,15 +18,16 @@ npm start              # http://localhost:5177
 
 ## 模型通道
 
-`server/llm.js` 支持三种通道，按环境变量自动选择：
+`server/llm.js` 按环境变量自动选择，默认走**通道链**：一组 Anthropic 协议端点按固定顺序 `anthropic → kimi → mimo → glm → deepseek` 逐个兜底，谁可用谁服务（没配 key 的自动跳过，可用 `LLM_CHAIN` 重排）：
 
 | 通道 | 配置 | 说明 |
 |---|---|---|
-| `anthropic` | `ANTHROPIC_API_KEY` | 官方 SDK，默认 `claude-opus-5`；选题走结构化输出（`output_config.format`），正文走流式 |
-| `openai` | `OPENAI_API_KEY` + `OPENAI_BASE_URL` | 任意 OpenAI 兼容接口：DeepSeek / Kimi / 通义 / vLLM / Ollama |
+| `anthropic` | `ANTHROPIC_API_KEY` | 官方 SDK，默认 `claude-opus-5-5`；选题走结构化输出（`output_config.format`），正文走流式 |
+| `kimi` / `mimo` / `glm` / `deepseek` | `LLM_<NAME>_BASE_URL` + `LLM_<NAME>_API_KEY` | 各家 Anthropic 协议兼容端点；结构化输出退化为提示词 + JSON 解析 |
+| `openai` | `LLM_PROVIDER=openai` + `OPENAI_API_KEY` + `OPENAI_BASE_URL` | 任意 OpenAI 兼容接口：DeepSeek / Kimi / 通义 / vLLM / Ollama |
 | `mock` | 无需配置 | 无密钥时的本地模板，保证全流程可跑通，便于演示和开发 |
 
-也可用 `LLM_PROVIDER` 强制指定。
+流式请求一旦开始输出就不再换通道（否则客户端会收到两截拼接的半成品）。`LLM_PROVIDER=anthropic` 可锁死官方通道不兜底。
 
 ## 账号设定
 
