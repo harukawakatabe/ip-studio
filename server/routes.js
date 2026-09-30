@@ -21,8 +21,9 @@ import { conf, save as saveSetting, status as settingsStatus } from './settings.
 import { hasKey } from './secrets.js';
 
 loadPricing();
-import { mockContent, mockTopics } from './mock.js';
-import { enrichSummaries, fetchBoards, parseManual, riskOf, screenItems } from './hotspots.js';
+import { mockContent, mockNewsDigest, mockTopics } from './mock.js';
+import { enrichSummaries, fetchBoards, parseManual, riskOf, screenItems, searchNews } from './hotspots.js';
+import { SEARCH_DIGEST_SYSTEM, searchDigestUser } from './prompts.js';
 import { generate, imageInfo } from './images.js';
 import {
   CONTENT_SYSTEM, DEFAULT_PLATFORM, DEFAULT_TONE, PLATFORMS, TONES,
@@ -2120,4 +2121,39 @@ export async function handlePricing(req, res) {
       note: '不随月度清零。',
     })),
   });
+}
+
+/* ---------- 用户自定义热点：关键词搜新闻 ---------- */
+export async function handleHotspotSearch(req, res, body) {
+  requireUser(req);
+  const q = String(body?.q ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (!q) return json(res, 400, { error: '关键词不能为空' });
+  // 纯搜索不烧模型，和抓榜单同级，不占创作额度——花钱的是 digest 那一步
+  const items = await searchNews(q);
+  const { kept, blocked } = screenItems(items);
+  json(res, 200, { items: kept, blocked: blocked.length });
+}
+
+export async function handleHotspotDigest(req, res, body) {
+  const user = requireUser(req);
+  const q = String(body?.q ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  // 列表就用界面上那份、由前端回传——服务端再搜一遍等于白花一次钱；
+  // 每条截断长度，保证整批拼进 user 消息不失控
+  const items = (Array.isArray(body?.items) ? body.items : []).slice(0, 20)
+    .map((it) => ({
+      title: String(it?.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 120),
+      summary: String(it?.summary ?? '').replace(/\s+/g, ' ').trim().slice(0, 400),
+    }))
+    .filter((it) => it.title);
+  if (!q || !items.length) return json(res, 400, { error: '缺少关键词或搜索结果' });
+  // 一次结构化调用把整批报道压成一个题材；feature 记成「热点汇总」，账单里能和选题分开
+  const out = await generateJSON({
+    system: SEARCH_DIGEST_SYSTEM,
+    user: searchDigestUser(q, items),
+    schema: { subject: '创作题材', angle: '切入角度一句话', reason: '为什么值得写，一句话' },
+    mock: mockNewsDigest,
+    feature: '热点汇总',
+    userId: user.id,
+  });
+  json(res, 200, { ...out });
 }

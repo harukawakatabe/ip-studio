@@ -334,6 +334,16 @@
           </div>
         </div>
         <div class="board" id="boardList"></div>
+        <details open class="news-search">
+          <summary>关键词搜新闻（自定义热点）</summary>
+          <p class="hint">按关键词搜全网新闻：用某一条去创作，或把整批结果汇总成一个方向</p>
+          <div style="display:flex;gap:8px;margin:8px 0">
+            <input id="newsSearchInput" style="flex:1" placeholder="输入新闻关键词" maxlength="60">
+            <button class="btn primary small" id="newsSearchBtn">搜索</button>
+          </div>
+          <div class="matches" id="newsSearchList"></div>
+        </details>
+        
         <details class="manual">
           <summary>榜单抓不到？手动粘一份</summary>
           <p class="hint">一行一条，可以直接从任何热榜页面复制粘贴，前面的序号会自动去掉。</p>

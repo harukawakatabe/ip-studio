@@ -3363,3 +3363,103 @@ function watchOrder(no) {
     } catch { /* 网络抖一下不算失败，下次再问 */ }
   }, 3000);
 }
+
+/* ---------- 关键词搜新闻（自定义热点）----------
+ * 搜到的每条新闻做成和热点板块同形状的对象，走 useSubject →
+ * state.pendingHotspot → 提交时的 body.hotspot，下游选题/成稿管线零改动。
+ */
+const elNews = {
+  input: $('newsSearchInput'),
+  btn: $('newsSearchBtn'),
+  list: $('newsSearchList'),
+};
+
+async function runNewsSearch() {
+  const q = elNews.input.value.trim();
+  if (!q) { toast('先输入关键词'); return; }
+  elNews.btn.disabled = true;
+  elNews.list.innerHTML = '<div class="hint">搜索中…</div>';
+  try {
+    const { items, blocked } = await api('/hotspots/search', { method: 'POST', body: { q } });
+    state.newsItems = items;
+    state.newsQ = q;
+    renderNewsResults(items, blocked);
+  } catch (err) {
+    elNews.list.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
+  } finally {
+    elNews.btn.disabled = false;
+  }
+}
+
+function renderNewsResults(items, blocked) {
+  if (!items.length) {
+    elNews.list.innerHTML = '<div class="hot-note">没搜到相关新闻，换个词试试。</div>';
+    return;
+  }
+  elNews.list.innerHTML =
+    (blocked ? `<div class="hint" style="margin-bottom:4px">已挡掉 ${blocked} 条不适合蹭的</div>` : '')
+    // 复用热点比对结果的 .match 卡片，和榜单区视觉一致
+    + items.map((it, idx) => `
+      <article class="match">
+        <div class="match-top">
+          <span class="badge">${esc(it.platform || '新闻')}</span>
+        </div>
+        <div class="match-block">
+          <b>新闻</b>
+          <p>${it.url
+            ? `<a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>`
+            : esc(it.title)}</p>
+          ${it.summary
+            ? `<p class="origin-summary">${esc(it.summary)}</p>`
+            : '<p class="origin-summary muted">没有摘要，动笔前请点开原文核实</p>'}
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn ghost small" data-news="${idx}">用这条去创作</button>
+        </div>
+      </article>`).join('')
+    + `<div style="margin-top:8px"><button class="btn primary small" id="newsDigestBtn">汇总 ${items.length} 条成一个方向去创作</button></div>`;
+}
+
+elNews.btn.addEventListener('click', runNewsSearch);
+elNews.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') runNewsSearch(); });
+
+elNews.list.addEventListener('click', async (e) => {
+  const one = e.target.closest('button[data-news]');
+  if (one) {
+    const it = state.newsItems[Number(one.dataset.news)];
+    if (!it) return;
+    setView('write');
+    resetBrief();
+    useSubject(it.title, {
+      title: it.title,
+      url: it.url,
+      summary: it.summary,
+      platform: '关键词搜索',
+      summarySource: 'search',
+    });
+    toast('已带回创作简报，成稿会引用这条新闻');
+    return;
+  }
+  if (e.target.id !== 'newsDigestBtn') return;
+  e.target.disabled = true;
+  e.target.textContent = '汇总中…';
+  try {
+    // 汇总方向由模型出（烧一次钱）；借势摘要带上全部标题，成稿时看得到素材全貌
+    const out = await api('/hotspots/digest', { method: 'POST', body: { q: state.newsQ, items: state.newsItems } });
+    setView('write');
+    resetBrief();
+    useSubject(out.subject, {
+      title: `围绕「${state.newsQ}」的汇总方向：${out.angle}`,
+      // 全部标题拼进借势摘要，1500 字封顶，防提示词过载
+      summary: state.newsItems.map((i) => `· ${i.title}`).join('\n').slice(0, 1500),
+      url: (state.newsItems[0] && state.newsItems[0].url) || '',
+      platform: '关键词搜索',
+      summarySource: 'search',
+    });
+    toast('已汇总成一个方向，带回创作简报');
+  } catch (err) {
+    toast(err.message);
+    e.target.disabled = false;
+    e.target.textContent = `汇总 ${state.newsItems.length} 条成一个方向去创作`;
+  }
+});

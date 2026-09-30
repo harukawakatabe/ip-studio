@@ -943,3 +943,15 @@ ${list.map((m) => `【${m.kind}】${m.title}\n${m.body}`).join('\n\n')}
 - **用不上的不要硬塞**——为了用素材而跑题，比不用素材更糟。
 - 同样**不要编造它们之外的个人经历、时间、数字、职位或人物关系**。`;
 };
+
+/* ---------- 关键词搜新闻：把搜索结果汇总成一个创作方向 ---------- */
+export const SEARCH_DIGEST_SYSTEM = `你是自媒体账号的选题策划。用户按关键词搜了一批新闻交给你通读。
+从这批报道里提炼一个值得写、有表达空间的创作题材，不是复述新闻本身。
+只输出 JSON：{ "subject": "创作题材，可直接作为简报输入", "angle": "切入角度一句话", "reason": "为什么值得写，一句话" }。
+题材要具体可落笔，不要「浅谈」「盘点」这类空词。`;
+
+export function searchDigestUser(q, items) {
+  return `关键词：${q}\n\n搜索结果（${items.length} 条）：\n`
+    + items.map((it, i) => `${i + 1}. ${it.title}${it.summary ? `\n   ${it.summary}` : ''}`).join('\n')
+    + '\n\n请提炼一个创作题材方向。';
+}

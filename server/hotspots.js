@@ -275,3 +275,46 @@ export async function enrichSummaries(items, summarize) {
     }
   }));
 }
+
+/* ---------- 用户自定义热点：关键词搜新闻（智谱 web_search）----------
+ * 和 GLM 聊天通道共用一把 key（LLM_GLM_API_KEY，也可单独给 ZHIPU_API_KEY）。
+ * 10 分钟按词缓存，防连点重复计费；接口失败原样抛错，UI 显示原因。
+ */
+const searchCache = new Map();
+
+export async function searchNews(q) {
+  const hit = searchCache.get(q);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.items;
+
+  // 智谱的 key 全接口通用——web_search 用的就是 GLM 聊天那把，不用单独申请
+  const key = process.env.LLM_GLM_API_KEY || process.env.ZHIPU_API_KEY;
+  if (!key) throw new Error('未配置智谱 key（.env 里的 LLM_GLM_API_KEY）');
+
+  const r = await fetch('https://open.bigmodel.cn/api/paas/v4/web_search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ search_engine: 'search_std', search_query: q, count: 12 }),
+    signal: AbortSignal.timeout(TIMEOUT),
+  });
+  if (!r.ok) throw new Error(`智谱搜索接口 ${r.status}`);
+  const d = await r.json().catch(() => ({}));
+  if (d.error) throw new Error(typeof d.error === 'string' ? d.error : '搜索接口返回错误');
+  const rows = d.search_result || (d.data && d.data.search_result) || [];
+  // search_result 的 content 是网页正文、不是摘要：截前 300 字当参考就够了，
+  // 全塞进去会把后面汇总那步的提示词撑爆
+  const items = rows
+    .map((x) => ({
+      title: clean(x.title),
+      url: x.link || x.url || '',
+      summary: clean(x.content || x.snippet).slice(0, 300),
+      platform: '关键词搜索',
+      summarySource: 'search',
+      heat: null,
+      at: Date.now(),
+    }))
+    .filter((it) => it.title);
+
+  if (!items.length) throw new Error('没搜到相关新闻，换个词试试');
+  searchCache.set(q, { at: Date.now(), items });
+  return items;
+}

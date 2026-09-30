@@ -60,6 +60,8 @@ const ROUTES = [
   ['GET', /^\/api\/admin\/eval\/(?<batch>[\w-]+)$/, R.handleEvalResult],
   ['POST', /^\/api\/admin\/eval\/(?<batch>[\w-]+)\/vote$/, R.handleEvalVote],
   ['GET', /^\/api\/hotspots$/, R.handleBoards],
+  ['POST', /^\/api\/hotspots\/search$/, R.handleHotspotSearch],
+  ['POST', /^\/api\/hotspots\/digest$/, R.handleHotspotDigest],
   ['GET', /^\/api\/personas\/(?<id>\d+)\/hotspots$/, R.handleHotspotRead],
   ['POST', /^\/api\/personas\/(?<id>\d+)\/hotspots$/, R.handleHotspotAnalyze],
   ['GET', /^\/api\/personas\/(?<id>\d+)\/subjects$/, R.handleSubjectList],
